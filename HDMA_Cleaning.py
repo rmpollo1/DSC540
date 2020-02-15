@@ -78,4 +78,4 @@ data = data[cols]
 data = pd.get_dummies(data)
 
 # Write Clean Data to File
-data.to_csv("./HDMA_Loan_Data_Clean.csv")
+data.to_csv("./HDMA_Loan_Data_Clean.csv",index=False)

@@ -68,5 +68,14 @@ data = data.dropna()
 data['approve'] = data.action_taken_name.apply(lambda x: action_dict[x])
 data = data.drop('action_taken_name',1)
 
+# Swap Target to first column for convience
+cols = list(data.columns)
+a = cols.index('approve') 
+cols[0] , cols[a] = cols[a] , cols[0]
+data = data[cols]
+
+# One hot encoding for catagorical data
+data = pd.get_dummies(data)
+
 # Write Clean Data to File
 data.to_csv("./HDMA_Loan_Data_Clean.csv")

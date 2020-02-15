@@ -2,9 +2,13 @@ import numpy as np
 import csv
 
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.metrics import accuracy_score, roc_auc_score
+from imblearn.under_sampling import RandomUnderSampler
 
+##########################################
+# Data Import
+#
 target_idx = 0 
 feat_start = 1
 
@@ -15,7 +19,11 @@ header = next(f)
 #Read data
 data=[]
 target=[]
-for row in f:
+for i,row in enumerate(f):
+    # For Testing Scipt read first 10k samples
+    #if i == 150_000:
+    #    break 
+
     #Load Target
     if row[target_idx]=='':                         #If target is blank, skip row                       
         continue
@@ -41,3 +49,21 @@ print('\n')
 
 data_np=np.asarray(data)
 target_np=np.asarray(target)
+#
+#
+##########################################
+data_train, data_validate, target_train, target_validate = train_test_split(data_np,target_np,train_size=10_000)
+##########################################
+# Grid Search
+params = {"n_estimators":[5,10,20,50,100]}
+scorers = {"Accuracy":'accuracy',"AUC":'roc_auc'}
+clf = RandomForestClassifier()
+
+rus = RandomUnderSampler()
+data_res, target_res = rus.fit_resample(data_train, target_train)
+
+grid = GridSearchCV(clf,param_grid=params,scoring=scorers,cv=5,refit='Accuracy')
+grid.fit(data_res,target_res)
+print(grid.cv_results_)
+
+print(grid.score(data_validate,target_validate))

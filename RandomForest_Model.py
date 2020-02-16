@@ -67,7 +67,7 @@ target_np=np.asarray(target)
 
 ##########################################
 #  Train / Test Split
-data_train, data_test, target_train, target_test = train_test_split(data_np,target_np,train_size=0.1,random_state=rand_st)
+data_train, data_test, target_train, target_test = train_test_split(data_np,target_np,train_size=0.66,random_state=rand_st)
 ##########################################
 
 ##########################################

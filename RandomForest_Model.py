@@ -5,11 +5,15 @@ import csv
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, train_test_split, StratifiedKFold
 from sklearn.metrics import accuracy_score, roc_auc_score
+
 from imblearn.under_sampling import RandomUnderSampler
+from imblearn.over_sampling import RandomOverSampler
 
 ##########################################
 # Global Parameters
 rand_st = 132
+resampling = 0 
+resampling_method = 1
 #
 #
 ##########################################
@@ -60,20 +64,35 @@ target_np=np.asarray(target)
 #
 #
 ##########################################
-data_train, data_validate, target_train, target_validate = train_test_split(data_np,target_np,train_size=1_000,random_state=rand_st)
+
+##########################################
+#  Train / Test Split
+data_train, data_test, target_train, target_test = train_test_split(data_np,target_np,train_size=0.1,random_state=rand_st)
+##########################################
+
+##########################################
+# Resampling 
+if resampling == 1:
+    print("--- Resampling ON ---")
+    if resampling_method == 1:
+        print("--- Undersampling ON ---")
+        rs = RandomUnderSampler(random_state=rand_st)
+    if resampling_method == 2:
+        print("--- Oversampling ON ---")
+        rs = RandomOverSampler(random_state=rand_st)
+    data_train, target_train = rs.fit_resample(data_train,target_train)
+
+##########################################
+
 ##########################################
 # Grid Search
 params = {"n_estimators":[5,10,20,50,100]}
 scorers = {"Accuracy":'accuracy',"AUC":'roc_auc'}
 clf = RandomForestClassifier(random_state=rand_st)
-
-rus = RandomUnderSampler(random_state=rand_st)
-data_res, target_res = rus.fit_resample(data_train, target_train)
-
 cross_val = StratifiedKFold(n_splits=5,random_state=rand_st)
 
 grid = GridSearchCV(clf,param_grid=params,scoring=scorers,cv=cross_val,refit='Accuracy')
-grid.fit(data_res,target_res)
+grid.fit(data_train,target_train)
 rf_results = pd.DataFrame(grid.cv_results_)
 rf_results.to_csv("./RandomForestResults.csv",index=False)
 
@@ -82,3 +101,15 @@ for _,row in rf_results.iterrows():
     print("Accuracy: {:0.2f} ( +/- {:0.2f})".format(row['mean_test_Accuracy'],2*row['std_test_Accuracy']))
     print("AUC: {:0.2f} ( +/- {:0.2f})".format(row['mean_test_AUC'],2*row['std_test_AUC']))
     print("Runtime: {:0.4f}".format(row['mean_fit_time']))
+##########################################
+
+##########################################
+# Test Performance
+print("--- Test Set Performance ---")
+target_test_pred = grid.predict(data_test)
+acc = accuracy_score(target_test,target_test_pred)
+auc = roc_auc_score(target_test,target_test_pred)
+print("Random Forest Test Accuracy: {}".format(acc))
+print("Random Forest Test AUC: {}".format(auc))
+##########################################
+

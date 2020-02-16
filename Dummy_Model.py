@@ -111,7 +111,7 @@ rf_results = pd.DataFrame(grid.cv_results_)
 rf_results.to_csv("./DummyResults.csv",index=False)
 
 for _,row in rf_results.iterrows():
-    print("Random Forest Metrics (Number of Trees {})".format(row['param_strategy']))
+    print("Dummy Metrics (Strategy {})".format(row['param_strategy']))
     print("\tAccuracy: {:0.3f} (+/- {:0.3f})".format(row['mean_test_Accuracy'],2*row['std_test_Accuracy']))
     print("\tAUC: {:0.3f} (+/- {:0.3f})".format(row['mean_test_AUC'],2*row['std_test_AUC']))
     print("\tRuntime: {:0.4f}".format(row['mean_fit_time']))

@@ -127,7 +127,7 @@ scorers = {
     'precision':'precision'
 }
 clf = RandomForestClassifier(min_samples_split=3,random_state=rand_st,n_jobs=-2)
-cross_val = StratifiedKFold(n_splits=10,random_state=rand_st)
+cross_val = StratifiedKFold(n_splits=5,random_state=rand_st)
 
 grid = GridSearchCV(clf,param_grid=params,scoring=scorers,cv=cross_val,refit='precision')
 grid.fit(data_train,target_train)

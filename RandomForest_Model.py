@@ -4,7 +4,9 @@ import csv
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, train_test_split, StratifiedKFold
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.metrics import accuracy_score, roc_auc_score, f1_score, balanced_accuracy_score, precision_score
+from sklearn.feature_selection import VarianceThreshold, SelectKBest
+from sklearn.feature_selection import chi2, f_classif, mutual_info_classif
 
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.over_sampling import RandomOverSampler
@@ -12,8 +14,11 @@ from imblearn.over_sampling import RandomOverSampler
 ##########################################
 # Global Parameters
 rand_st = 132
-resampling = 0 
-resampling_method = 1
+resampling = 1                  # Resampling Switch
+resampling_method = 1           # Undersampling = 1; Oversampling = 2
+fs = 1                          # Feature Selection Switch
+fs_method = 2                   # Feature Selection Method
+fs_scorer = chi2                # Filter Selection Scorer
 #
 #
 ##########################################
@@ -66,6 +71,34 @@ target_np=np.asarray(target)
 ##########################################
 
 ##########################################
+# Feature Selection
+if fs == 1: 
+    # Apply Feature Selection 
+
+    if fs_method == 1:
+        print("--- LV Filter ON ---")
+        flt = VarianceThreshold(threshold=0.5)
+        data_np = flt.fit_transform(data_np,target_np)
+    
+    if fs_method == 2:
+        print("--- Feature Selection ON ---")
+        flt = SelectKBest(score_func=fs_scorer,k=20)
+        data_np = flt.fit_transform(data_np,target_np)
+
+    selected = []
+    removed = []
+    for i,c in zip(flt.get_support(),header[1:]):
+        if i:
+            selected.append(c)
+        else:
+            removed.append(c)
+    print("Features Selected: ",selected)
+    print("Features Removed: ",removed)
+    print("Selected/Removed/Total: (",len(selected),len(removed),len(header)-1,")")
+#
+##########################################
+
+##########################################
 #  Train / Test Split
 data_train, data_test, target_train, target_test = train_test_split(data_np,target_np,train_size=0.66,random_state=rand_st)
 ##########################################
@@ -81,35 +114,44 @@ if resampling == 1:
         print("--- Oversampling ON ---")
         rs = RandomOverSampler(random_state=rand_st)
     data_train, target_train = rs.fit_resample(data_train,target_train)
+    print("Resampled Training Data Samples: {}".format(len(target_train)))
 
 ##########################################
 
 ##########################################
 # Grid Search
-params = {"n_estimators":[5,10,20,50,100]}
-scorers = {"Accuracy":'accuracy',"AUC":'roc_auc'}
-clf = RandomForestClassifier(random_state=rand_st)
-cross_val = StratifiedKFold(n_splits=5,random_state=rand_st)
+params = {"n_estimators":[5,10,20]}
+scorers = {
+    "Accuracy":'accuracy',"AUC":'roc_auc',
+    'F1':'f1','bAcc':'balanced_accuracy',
+    'precision':'precision'
+}
+clf = RandomForestClassifier(min_samples_split=3,random_state=rand_st,n_jobs=-2)
+cross_val = StratifiedKFold(n_splits=10,random_state=rand_st)
 
-grid = GridSearchCV(clf,param_grid=params,scoring=scorers,cv=cross_val,refit='Accuracy')
+grid = GridSearchCV(clf,param_grid=params,scoring=scorers,cv=cross_val,refit='precision')
 grid.fit(data_train,target_train)
 rf_results = pd.DataFrame(grid.cv_results_)
 rf_results.to_csv("./RandomForestResults.csv",index=False)
 
 for _,row in rf_results.iterrows():
     print("Random Forest Metrics (Number of Trees {})".format(row['param_n_estimators']))
-    print("Accuracy: {:0.2f} ( +/- {:0.2f})".format(row['mean_test_Accuracy'],2*row['std_test_Accuracy']))
-    print("AUC: {:0.2f} ( +/- {:0.2f})".format(row['mean_test_AUC'],2*row['std_test_AUC']))
-    print("Runtime: {:0.4f}".format(row['mean_fit_time']))
+    print("\tAccuracy: {:0.3f} (+/- {:0.3f})".format(row['mean_test_Accuracy'],2*row['std_test_Accuracy']))
+    print("\tBalanced Acc: {:0.3f} (+/- {:0.3f})".format(row['mean_test_bAcc'],2*row['std_test_bAcc']))
+    print("\tAUC: {:0.3f} (+/- {:0.3f})".format(row['mean_test_AUC'],2*row['std_test_AUC']))
+    print("\tF1: {:0.3f} (+/- {:0.3f})".format(row['mean_test_F1'],2*row['std_test_F1']))
+    print("\tPrecision: {:0.3f} (+/- {:0.3f})".format(row['mean_test_precision'],2*row['std_test_precision']))
+    print("\tMean Fit Time: {:0.4f}".format(row['mean_fit_time']))
 ##########################################
 
 ##########################################
 # Test Performance
 print("--- Test Set Performance ---")
 target_test_pred = grid.predict(data_test)
-acc = accuracy_score(target_test,target_test_pred)
-auc = roc_auc_score(target_test,target_test_pred)
-print("Random Forest Test Accuracy: {}".format(acc))
-print("Random Forest Test AUC: {}".format(auc))
+sc_names = ["Accuracy","AUC","F1","Balanced Acc.","Precision"]
+sc_func = [accuracy_score, roc_auc_score, f1_score, balanced_accuracy_score, precision_score]
+for sc_name, sc_f in zip(sc_names,sc_func):
+    sc = sc_f(target_test,target_test_pred)
+    print("Random Forest Test {}: {:0.3f}".format(sc_name,sc))
 ##########################################
 

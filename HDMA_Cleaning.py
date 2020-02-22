@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from sklearn.model_selection import train_test_split
+
 
 ####################
 # Globals
@@ -18,7 +20,7 @@ action_dict = {
 #####################
 
 # Read in Raw Data
-data = pd.read_csv("./Washington_State_HDMA-2016.csv",low_memory=False,dtype={'census_tract_number':'object'})
+data = pd.read_csv("./Data/Washington_State_HDMA-2016.csv",low_memory=False,dtype={'census_tract_number':'object'})
 
 # Column Remover for missing values
 def missing_value_threshold(df,threshold=0.9):
@@ -52,7 +54,8 @@ data = data.drop(
         'agency_name','as_of_year','state_name',
         'state_abbr','sequence_number','respondent_id',
         'application_date_indicator','msamd_name',
-        'county_name','census_tract_number'
+        'county_name','census_tract_number','agency_abbr',
+        'purchaser_type_name'
     ]
     ,1
 ) 
@@ -74,8 +77,15 @@ a = cols.index('approve')
 cols[0] , cols[a] = cols[a] , cols[0]
 data = data[cols]
 
+# Print Features
+for c in data.columns:
+    print(c)
+
 # One hot encoding for catagorical data
 data = pd.get_dummies(data)
 
+training, testing = train_test_split(data,train_size=.75)
+
 # Write Clean Data to File
-data.to_csv("./HDMA_Loan_Data_Clean.csv",index=False)
+training.to_csv("./Data/Training_Data.csv",index=False)
+testing.to_csv("./Data/Testing_Data.csv",index=False)

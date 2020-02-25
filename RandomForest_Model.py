@@ -1,11 +1,14 @@
+import sys
 import numpy as np 
 import pandas as pd 
 import csv
 
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, train_test_split, StratifiedKFold
 from sklearn.metrics import accuracy_score, roc_auc_score, f1_score, balanced_accuracy_score, precision_score
-from sklearn.feature_selection import VarianceThreshold, SelectKBest
+from sklearn.metrics import confusion_matrix
+from sklearn.feature_selection import VarianceThreshold, SelectKBest, SelectFromModel
 from sklearn.feature_selection import chi2, f_classif, mutual_info_classif
 
 from imblearn.under_sampling import RandomUnderSampler
@@ -13,12 +16,23 @@ from imblearn.over_sampling import RandomOverSampler
 
 ##########################################
 # Global Parameters
-rand_st = 132
 resampling = 1                  # Resampling Switch
 resampling_method = 1           # Undersampling = 1; Oversampling = 2
 fs = 1                          # Feature Selection Switch
-fs_method = 2                   # Feature Selection Method
-fs_scorer = chi2                # Filter Selection Scorer
+fs_method = 3                   # Feature Selection Method
+fs_scorer = mutual_info_classif                # Filter Selection Scorer
+#
+#
+##########################################
+
+##########################################
+# Cache Results
+try:
+    res_file = sys.argv[1]
+except IndexError as e:
+    res_file = "RandomForest_Results.csv"
+    print("No Result File Supplied saving results in RandomForest_Results.csv")
+
 #
 #
 ##########################################
@@ -29,7 +43,7 @@ fs_scorer = chi2                # Filter Selection Scorer
 target_idx = 0 
 feat_start = 1
 
-f = csv.reader(open("HDMA_Loan_Data_Clean.csv"), delimiter = ',', quotechar = '"')
+f = csv.reader(open("./Data/Training_Data.csv"), delimiter = ',', quotechar = '"')
 
 header = next(f)
 
@@ -71,6 +85,18 @@ target_np=np.asarray(target)
 ##########################################
 
 ##########################################
+# Base Estimator (Random Forest)
+clf = RandomForestClassifier(n_estimators=20,min_samples_split=3,n_jobs=-2)
+
+##########################################
+
+##########################################
+# Feature Scaling
+data_np = MinMaxScaler().fit_transform(data_np)
+
+##########################################
+
+##########################################
 # Feature Selection
 if fs == 1: 
     # Apply Feature Selection 
@@ -82,7 +108,12 @@ if fs == 1:
     
     if fs_method == 2:
         print("--- Feature Selection ON ---")
-        flt = SelectKBest(score_func=fs_scorer,k=20)
+        flt = SelectKBest(score_func=fs_scorer,k=30)
+        data_np = flt.fit_transform(data_np,target_np)
+    
+    if fs_method == 3:
+        print("--- Embedded Feature Selection ON ---")
+        flt = SelectFromModel(clf, prefit=False, threshold='mean', max_features=None)
         data_np = flt.fit_transform(data_np,target_np)
 
     selected = []
@@ -99,40 +130,34 @@ if fs == 1:
 ##########################################
 
 ##########################################
-#  Train / Test Split
-data_train, data_test, target_train, target_test = train_test_split(data_np,target_np,train_size=0.66,random_state=rand_st)
-##########################################
-
-##########################################
 # Resampling 
 if resampling == 1:
     print("--- Resampling ON ---")
     if resampling_method == 1:
         print("--- Undersampling ON ---")
-        rs = RandomUnderSampler(random_state=rand_st)
+        rs = RandomUnderSampler()
     if resampling_method == 2:
         print("--- Oversampling ON ---")
-        rs = RandomOverSampler(random_state=rand_st)
-    data_train, target_train = rs.fit_resample(data_train,target_train)
-    print("Resampled Training Data Samples: {}".format(len(target_train)))
+        rs = RandomOverSampler()
+    data_np, target_np = rs.fit_resample(data_np,target_np)
+    print("Resampled Training Data Samples: {}".format(len(target_np)))
 
 ##########################################
 
 ##########################################
 # Grid Search
-params = {"n_estimators":[5,10,20]}
+params = {"n_estimators":[5,10,20,50,100]}
 scorers = {
     "Accuracy":'accuracy',"AUC":'roc_auc',
     'F1':'f1','bAcc':'balanced_accuracy',
     'precision':'precision'
 }
-clf = RandomForestClassifier(min_samples_split=3,random_state=rand_st,n_jobs=-2)
-cross_val = StratifiedKFold(n_splits=5,random_state=rand_st)
+cross_val = StratifiedKFold(n_splits=5)
 
 grid = GridSearchCV(clf,param_grid=params,scoring=scorers,cv=cross_val,refit='precision')
-grid.fit(data_train,target_train)
+grid.fit(data_np,target_np)
 rf_results = pd.DataFrame(grid.cv_results_)
-rf_results.to_csv("./RandomForestResults.csv",index=False)
+rf_results.to_csv(res_file,index=False)
 
 for _,row in rf_results.iterrows():
     print("Random Forest Metrics (Number of Trees {})".format(row['param_n_estimators']))
@@ -144,14 +169,4 @@ for _,row in rf_results.iterrows():
     print("\tMean Fit Time: {:0.4f}".format(row['mean_fit_time']))
 ##########################################
 
-##########################################
-# Test Performance
-print("--- Test Set Performance ---")
-target_test_pred = grid.predict(data_test)
-sc_names = ["Accuracy","AUC","F1","Balanced Acc.","Precision"]
-sc_func = [accuracy_score, roc_auc_score, f1_score, balanced_accuracy_score, precision_score]
-for sc_name, sc_f in zip(sc_names,sc_func):
-    sc = sc_f(target_test,target_test_pred)
-    print("Random Forest Test {}: {:0.3f}".format(sc_name,sc))
-##########################################
 

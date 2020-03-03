@@ -84,8 +84,13 @@ for c in data.columns:
 # One hot encoding for catagorical data
 data = pd.get_dummies(data)
 
-training, testing = train_test_split(data,train_size=.75)
+# Co Applicant Binary Feature
+# Remove 3 dummy features sex, race, ethnicity (No Co-applicant)
+data['no_co_applicant'] = data['co_applicant_race_name_1_No co-applicant']
+data.drop(['co_applicant_race_name_1_No co-applicant','co_applicant_ethnicity_name_No co-applicant','co_applicant_sex_name_No co-applicant'],1)
 
-# Write Clean Data to File
+training, testing = train_test_split(data,train_size=.8,stratify=data.approve)
+
+# Write Clean Data to Files
 training.to_csv("./Data/Training_Data.csv",index=False)
 testing.to_csv("./Data/Testing_Data.csv",index=False)

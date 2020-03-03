@@ -8,6 +8,7 @@ from sklearn.svm import LinearSVC
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import GridSearchCV, train_test_split, StratifiedKFold
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.pipeline import make_pipeline
 
 from imblearn.under_sampling import RandomUnderSampler
 
@@ -38,7 +39,7 @@ df = np.array(df)
 
 # Feature Scaling
 scaler = MinMaxScaler()
-df = scaler.fit_transform(df)
+#df = scaler.fit_transform(df)
 
 # Filter Based Feature Selectors 
 chi2_flt = SelectKBest(score_func=chi2)
@@ -57,15 +58,15 @@ df, target = RandomUnderSampler().fit_resample(df,target)
 # Base Classifiers
 clf_names = ["Random Forest","Linear SVM","MLP"]
 rf_clf = RandomForestClassifier(n_estimators=20,criterion='gini',min_samples_split=3)
-svm_clf = LinearSVC(C=1.0)
-mlp_clf = MLPClassifier(hidden_layer_sizes=(8,),activation='relu',solver='adam')
+svm_clf = make_pipeline(scaler,LinearSVC(C=1.0)) 
+mlp_clf = make_pipeline(scaler,MLPClassifier(hidden_layer_sizes=(8,),activation='relu',solver='adam'))
 clfs = [rf_clf,svm_clf,mlp_clf]
 
 # Cross Validation Stategy 
 cv = StratifiedKFold(n_splits=5)
 
 # Number of Features to Select
-for k in [5,10,15,20,30,40,len(feature_names)]:
+for k in [5,8,10,12,15,20,30,40,len(feature_names)]:
     # Feature Selection Methods 
     # Chi2, F_Classif, & Mutual Info
     for flt_name, flt in zip(filter_names,filters):

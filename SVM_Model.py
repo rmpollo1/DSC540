@@ -120,7 +120,7 @@ if fs == 1:
 
     selected = []
     removed = []
-    for i,c in zip(flt.get_support(),feature_names[]):
+    for i,c in zip(flt.get_support(),feature_names):
         if i:
             selected.append(c)
         else:

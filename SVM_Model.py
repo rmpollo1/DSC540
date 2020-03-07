@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd 
 import csv
 
-from sklearn.svm import LinearSVC
+from sklearn.svm import LinearSVC, SVC
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import GridSearchCV, train_test_split, StratifiedKFold
 from sklearn.metrics import accuracy_score, roc_auc_score, f1_score, balanced_accuracy_score, precision_score
@@ -19,7 +19,7 @@ from imblearn.over_sampling import RandomOverSampler
 resampling = 1                  # Resampling Switch
 resampling_method = 1           # Undersampling = 1; Oversampling = 2
 fs = 1                          # Feature Selection Switch
-fs_method = 2                   # Feature Selection Method
+fs_method = 3                   # Feature Selection Method
 fs_scorer = mutual_info_classif                # Filter Selection Scorer
 #
 #
@@ -29,8 +29,10 @@ fs_scorer = mutual_info_classif                # Filter Selection Scorer
 # Cache Results
 try:
     res_file = sys.argv[1]
+    res_file_2 = sys.argv[2]
 except IndexError as e:
-    res_file = "./Results/SVM_Results.csv"
+    res_file = "./Final_Results/Linear_SVM_Results.csv"
+    res_file = "./Final_Results/Kernel_SVM_Results.csv"
     print("No Result File Supplied saving results in ",res_file)
 
 #
@@ -38,61 +40,28 @@ except IndexError as e:
 ##########################################
 
 ##########################################
-# Data Import
+# Import Dataset
 #
-target_idx = 0 
-feat_start = 1
+# Read In Training Data
+df = pd.read_csv("./Data/Training_Data.csv")
 
-f = csv.reader(open("./Data/Training_Data.csv"), delimiter = ',', quotechar = '"')
-
-header = next(f)
-
-#Read data
-data=[]
-target=[]
-for i,row in enumerate(f):
-    # For Testing Scipt read first 10k samples
-    #if i == 150_000:
-    #    break 
-
-    #Load Target
-    if row[target_idx]=='':                         #If target is blank, skip row                       
-        continue
-    else:
-        target.append(float(row[target_idx]))       #If pre-binned class, change float to int
-
-    #Load row into temp array, cast columns  
-    temp=[]
-                 
-    for j in range(feat_start,len(header)):
-        if row[j]=='':
-            temp.append(float())
-        else:
-            temp.append(float(row[j]))
-
-    #Load temp into Data array
-    data.append(temp)
-  
-#Test Print
-print(header)
-print(len(target),len(data))
-print('\n')
-
-data_np=np.asarray(data)
-target_np=np.asarray(target)
-#
-#
+# Seperate Target from Feature
+# Convert to Numpy Array
+target = np.array(df['approve'])
+df = df.drop('approve',axis=1)
+feature_names = df.columns 
+df = np.array(df)
 ##########################################
 
 ##########################################
-# Base Estimator (Linear SVM)
-clf = LinearSVC()
-
+# Base Estimator (Linear SVC)
+clf = LinearSVC(C=1.0)
+clf_2 = SVC(C=1.0,kernel='rbf')
 ##########################################
 
 ##########################################
 # Feature Scaling
-data_np = MinMaxScaler().fit_transform(data_np)
+df = MinMaxScaler().fit_transform(df)
 
 ##########################################
 
@@ -103,29 +72,62 @@ if fs == 1:
 
     if fs_method == 1:
         print("--- LV Filter ON ---")
-        flt = VarianceThreshold(threshold=0.5)
-        data_np = flt.fit_transform(data_np,target_np)
+        flt = VarianceThreshold(threshold=0.2)
+        df = flt.fit_transform(df,target)
     
     if fs_method == 2:
         print("--- Feature Selection ON ---")
-        flt = SelectKBest(score_func=fs_scorer,k=15)
-        data_np = flt.fit_transform(data_np,target_np)
+        flt = SelectKBest(score_func=fs_scorer,k=30)
+        df = flt.fit_transform(df,target)
     
     if fs_method == 3:
         print("--- Embedded Feature Selection ON ---")
         flt = SelectFromModel(clf, prefit=False, threshold='mean', max_features=None)
-        data_np = flt.fit_transform(data_np,target_np)
+        df = flt.fit_transform(df,target)
 
     selected = []
     removed = []
-    for i,c in zip(flt.get_support(),header[1:]):
+    for i,c in zip(flt.get_support(),feature_names):
         if i:
             selected.append(c)
         else:
             removed.append(c)
     print("Features Selected: ",selected)
     print("Features Removed: ",removed)
-    print("Selected/Removed/Total: (",len(selected),len(removed),len(header)-1,")")
+    print("Selected/Removed/Total: (",len(selected),len(removed),len(feature_names),")")
+#
+##########################################
+
+##########################################
+# Feature Selection
+if fs == 1: 
+    # Apply Feature Selection 
+
+    if fs_method == 1:
+        print("--- LV Filter ON ---")
+        flt = VarianceThreshold(threshold=0.16)
+        df = flt.fit_transform(df,target)
+    
+    if fs_method == 2:
+        print("--- Feature Selection ON ---")
+        flt = SelectKBest(score_func=fs_scorer,k=15)
+        df = flt.fit_transform(df,target)
+    
+    if fs_method == 3:
+        print("--- Embedded Feature Selection ON ---")
+        flt = SelectFromModel(clf, prefit=False, threshold='mean', max_features=None)
+        df = flt.fit_transform(df,target)
+
+    selected = []
+    removed = []
+    for i,c in zip(flt.get_support(),feature_names[]):
+        if i:
+            selected.append(c)
+        else:
+            removed.append(c)
+    print("Features Selected: ",selected)
+    print("Features Removed: ",removed)
+    print("Selected/Removed/Total: (",len(selected),len(removed),len(feature_names),")")
 #
 ##########################################
 
@@ -139,14 +141,14 @@ if resampling == 1:
     if resampling_method == 2:
         print("--- Oversampling ON ---")
         rs = RandomOverSampler()
-    data_np, target_np = rs.fit_resample(data_np,target_np)
-    print("Resampled Training Data Samples: {}".format(len(target_np)))
+    df, target = rs.fit_resample(df,target)
+    print("Resampled Training Data Samples: {}".format(len(target)))
 
 ##########################################
 
 ##########################################
 # Grid Search
-params = {"C":np.logspace(-1,1,3)}
+params = {'C':np.logspace(-1,1,3)}
 scorers = {
     "Accuracy":'accuracy',"AUC":'roc_auc',
     'F1':'f1','bAcc':'balanced_accuracy',
@@ -155,12 +157,12 @@ scorers = {
 cross_val = StratifiedKFold(n_splits=5)
 
 grid = GridSearchCV(clf,param_grid=params,scoring=scorers,cv=cross_val,refit='precision')
-grid.fit(data_np,target_np)
+grid.fit(df,target)
 rf_results = pd.DataFrame(grid.cv_results_)
 rf_results.to_csv(res_file,index=False)
 
 for _,row in rf_results.iterrows():
-    print("Linear SVM Metrics (C Value {})".format(row['param_C']))
+    print("Linear SVM Metrics (C {})".format(row['param_C']))
     print("\tAccuracy: {:0.3f} (+/- {:0.3f})".format(row['mean_test_Accuracy'],2*row['std_test_Accuracy']))
     print("\tBalanced Acc: {:0.3f} (+/- {:0.3f})".format(row['mean_test_bAcc'],2*row['std_test_bAcc']))
     print("\tAUC: {:0.3f} (+/- {:0.3f})".format(row['mean_test_AUC'],2*row['std_test_AUC']))

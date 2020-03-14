@@ -10,7 +10,6 @@ from sklearn.model_selection import train_test_split
 action_dict = {
     'Loan originated': 1,
     'Application denied by financial institution':0,
-    'Loan purchased by the institution': 1,
     'Application approved but not accepted': 1,
     'Preapproval request approved but not accepted': 1,
     'Preapproval request denied by financial institution':0
@@ -63,6 +62,7 @@ data = data.drop(
 # Drop Samples based on action taken
 data = data[data.action_taken_name != 'File closed for incompleteness'] # Can be caught by other automation
 data = data[data.action_taken_name != 'Application withdrawn by applicant'] # No Application Decision Reached
+data = data[data.action_taken_name != 'Loan purchased by the institution'] # Interested only in originating institution
 
 # Drop Observations with missing Values
 data = data.dropna()
@@ -80,6 +80,12 @@ data = data[cols]
 # Print Features
 for c in data.columns:
     print(c)
+
+# Print Target Distribution
+p_acc = data.approve.mean()
+print("Percent Approved: {:0.3f}\nPercent Rejected: {:0.3f}".format(p_acc,1-p_acc))
+n_obs, _ = data.shape
+print("Total Number of Samples: {}".format(n_obs))
 
 # One hot encoding for catagorical data
 data = pd.get_dummies(data)

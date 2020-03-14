@@ -10,7 +10,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 # Resampling
 from imblearn.under_sampling import RandomUnderSampler
-from imblearn.over_sampling import RandomOverSampler
+from imblearn.over_sampling import RandomOverSampler, SMOTE
 from imblearn.pipeline import Pipeline
 
 from sklearn.exceptions import ConvergenceWarning
@@ -43,6 +43,8 @@ target = np.array(df['approve'])
 df = df.drop('approve',axis=1)
 feature_names = df.columns 
 df = np.array(df)
+n_obs, n_var = df.shape
+print("Number of Samples: {} \nNumber of Features: {}".format(n_obs, n_var))
 ##########################################
 
 ##########################################
@@ -54,11 +56,12 @@ scaler = MinMaxScaler()
 # Resamplers
 over_rs = RandomOverSampler()
 under_rs = RandomUnderSampler()
+sm = SMOTE()
 ##########################################
 
 ##########################################
 # Models
-rf_clf = RandomForestClassifier(n_estimators=20,criterion='entropy',min_samples_split=3)
+rf_clf = RandomForestClassifier(n_estimators=50,criterion='entropy',min_samples_split=3)
 svm_clf = LinearSVC(C=1.0)
 mlp_clf = MLPClassifier(hidden_layer_sizes=(8,))
 ##########################################
@@ -66,8 +69,8 @@ mlp_clf = MLPClassifier(hidden_layer_sizes=(8,))
 ##########################################
 # Pipelines
 pipe = Pipeline(steps=[
-    ('rs',over_rs),
     ('scaling',scaler),
+    ('rs',over_rs),
     ('clf',rf_clf)
 ])
 #print(pipe.get_params().keys())
@@ -76,13 +79,13 @@ pipe = Pipeline(steps=[
 ##########################################
 # Cross Validation (Resampling)
 params = {
-    'rs':[over_rs,under_rs],
+    'rs':[over_rs,under_rs, sm],
     'clf':[rf_clf,mlp_clf,svm_clf]
 }
 spliter = StratifiedKFold(n_splits=5)
 grid = GridSearchCV(estimator=pipe,param_grid=params,scoring=scorers,cv=spliter,refit=False,n_jobs=-2)
 grid.fit(df,target)
 res = pd.DataFrame(grid.cv_results_)
-res.to_csv('./Results/Resample_Results.csv',index=False)
+res.to_csv('./Final_Results/SMOTE_Results.csv',index=False)
 ##########################################
 
